@@ -49,6 +49,10 @@ font = "geist"
 radius = "small"
 menuAccent = "subtle"
 menuColor = "default"
+[client.vite]
+plugins = ["tailwindcss()"]
+lib_imports = ["import tailwindcss from '@tailwindcss/vite'"]
+
 [jacpack]
 name = 'blastradius'
 description = 'Jac IDE snapshot for blastradius'
