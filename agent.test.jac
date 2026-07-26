@@ -8,12 +8,12 @@ import from jaclang.byllm.lib { MockLLM }
 import from graph { Function }
 import from ingest { ingest_repo }
 
-glob llm = MockLLM(
-    model_name="mockllm",
-    config={"outputs": ["This is a low-risk change: only `process` calls `helper` directly, and `main` depends on it transitively. Run tests/test_app.py before merging."]}
-);
-
 test "explain_risk runs against the graph-grounded blast radius" {
+    llm = MockLLM(
+        model_name="mockllm",
+        config={"outputs": ["This is a low-risk change: only `process` calls `helper` directly, and `main` depends on it transitively. Run tests/test_app.py before merging."]}
+    );
+
     ingest_repo("tests/fixture_repo");
 
     narrative = explain_risk("helper", ["process", "main"]);

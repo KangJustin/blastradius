@@ -12,9 +12,11 @@ jac-version = "==0.34.7"
 watchdog = ">=3.0.0"
 
 [byllm.model]
-default_model = "gpt-4o"
-api_key = "${OPENAI_API_KEY}"
+default_model = "claude-sonnet-4-6"
 
 [test]
 directory = "."
 verbose = true
+
+[run]
+cache = false
