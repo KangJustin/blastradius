@@ -12,6 +12,7 @@ jac-version = "==0.34.7"
 watchdog = ">=3.0.0"
 
 [dependencies.npm]
+"@fontsource-variable/geist" = "*"
 "@hugeicons/core-free-icons" = "*"
 "@hugeicons/react" = "*"
 radix-ui = "*"
@@ -47,7 +48,11 @@ theme = "indigo"
 font = "geist"
 radius = "small"
 menuAccent = "subtle"
-
+menuColor = "default"
 [jacpack]
 name = 'blastradius'
 description = 'Jac IDE snapshot for blastradius'
+
+[client.vite]
+plugins = ["tailwindcss()"]
+lib_imports = ["import tailwindcss from '@tailwindcss/vite'"]
