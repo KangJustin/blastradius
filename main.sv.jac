@@ -8,3 +8,4 @@ import from graph { File, Function, Imports, Calls }
 import from ingest { ingest_repo, IngestResult }
 import from blastradius { BlastRadius }
 import from agent { explain_risk }
+import from graphdata { get_graph }

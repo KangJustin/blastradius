@@ -6,6 +6,7 @@ from the project root: `jac clean --all --force && jac test`.
 import from graph { File, Function, Calls }
 import from ingest { ingest_repo }
 import from blastradius { BlastRadius }
+import from graphdata { get_graph }
 
 test "ingest_repo builds the expected graph from a real fixture repo" {
     result = ingest_repo("tests/fixture_repo");
@@ -69,4 +70,23 @@ test "ingest_repo raises clearly on a nonexistent repo path" {
     } except FileNotFoundError {
         assert True;
     }
+}
+
+test "get_graph returns real nodes and edges for the frontend graph view" {
+    ingest_repo("tests/fixture_repo");
+
+    g = get_graph();
+
+    assert len(g["functions"]) == 4;
+    assert len(g["files"]) == 2;
+    assert len(g["calls"]) == 2;
+
+    fn_ids = [fn["id"] for fn in g["functions"]];
+    assert "helper" in fn_ids;
+    assert "process" in fn_ids;
+    assert "main" in fn_ids;
+
+    call_pairs = [(c["source"], c["target"]) for c in g["calls"]];
+    assert ("process", "helper") in call_pairs;
+    assert ("main", "process") in call_pairs;
 }
