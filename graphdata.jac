@@ -1,32 +1,31 @@
-"""Read-only endpoint that returns the full ingested graph (files, functions,
-call edges) as plain JSON, so a frontend can render an actual node-link
-diagram instead of only printing traversal results as text.
-"""
+"""Returns the full ingested call graph: all Function nodes and Calls edges."""
 
-import from graph { File, Function, Calls }
+import from graph { Function, Calls }
 
-def:pub get_graph() -> dict {
-    fn_nodes: list[dict] = [];
-    for fn in [root -->[?:Function]] {
-        fn_nodes.append({"id": fn.name, "file": fn.file, "type": "function"});
-    }
+obj GraphData {
+    has nodes: list[dict];
+    has edges: list[dict];
+}
 
-    file_nodes: list[dict] = [];
-    for f in [root -->[?:File]] {
-        file_nodes.append({"id": f.path, "type": "file"});
-    }
+def:pub get_graph() -> GraphData {
+    all_fns: list = [root -->][?:Function];
+    nodes: list[dict] = [];
+    edges: list[dict] = [];
 
-    call_edges: list[dict] = [];
-    for fn in [root -->[?:Function]] {
+    for fn in all_fns {
+        nodes.append({
+            "name": fn.name,
+            "file": fn.file,
+            "source": fn.source[:500] if fn.source else ""
+        });
+        # Outgoing call edges
         for callee in [fn ->:Calls:->] {
-            call_edges.append({"source": fn.name, "target": callee.name});
+            edges.append({
+                "caller": fn.name,
+                "callee": callee.name
+            });
         }
     }
 
-    return {
-        "functions": fn_nodes,
-        "files": file_nodes,
-        "calls": call_edges
-    };
+    return GraphData(nodes=nodes, edges=edges);
 }
-sem get_graph = "Return the full ingested call graph as plain JSON (function nodes, file nodes, call edges) so a client can render an interactive node-link graph visualization, separate from any single blast-radius traversal.";
