@@ -17,3 +17,7 @@ default_model = "claude-sonnet-4-6"
 [test]
 directory = "."
 verbose = true
+
+[jacpack]
+name = 'blastradius'
+description = 'Jac IDE snapshot for blastradius'
