@@ -17,6 +17,3 @@ default_model = "claude-sonnet-4-6"
 [test]
 directory = "."
 verbose = true
-
-[run]
-cache = false

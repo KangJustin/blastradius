@@ -7,7 +7,7 @@ answering instead of guessing.
 import from graph { Function }
 import from jaclang.byllm.lib { Model }
 
-glob llm = Model(model_name="claude-sonnet-4-6");
+glob llm: any = Model(model_name="claude-sonnet-4-6");
 
 def read_source(fn_name: str) -> str {
     matches = [root -->[?:Function, name == fn_name]];

@@ -13,9 +13,12 @@ walker:pub BlastRadius {
     has visited: list[str] = [];
     has hop_of: dict[str, int] = {};
     has reports: list[Function] = [];
+    has found: bool = True;
 
     can start with Root entry {
-        visit [-->[?:Function, name == self.target_fn]];
+        visit [-->[?:Function, name == self.target_fn]] else {
+            self.found = False;
+        }
     }
 
     can walk with Function entry {

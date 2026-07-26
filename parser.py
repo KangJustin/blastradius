@@ -30,6 +30,9 @@ def parse_repo(repo_path):
       "imports": [{"src_file": rel_path, "dst_file": rel_path}, ...],
     }
     """
+    if not os.path.isdir(repo_path):
+        raise FileNotFoundError(f"repo_path does not exist or is not a directory: {repo_path}")
+
     py_files = []
     for dirpath, dirnames, filenames in os.walk(repo_path):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]

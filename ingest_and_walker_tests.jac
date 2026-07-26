@@ -50,4 +50,23 @@ test "BlastRadius respects max_hops" {
     names = [f.name for f in result.reports];
 
     assert names == ["helper"];
+    assert result.found;
+}
+
+test "BlastRadius signals not-found for a nonexistent target_fn" {
+    ingest_repo("tests/fixture_repo");
+
+    result = root spawn BlastRadius(target_fn="does_not_exist", max_hops=3);
+
+    assert not result.found;
+    assert result.reports == [];
+}
+
+test "ingest_repo raises clearly on a nonexistent repo path" {
+    try {
+        ingest_repo("tests/does_not_exist_at_all");
+        assert False, "should have raised";
+    } except FileNotFoundError {
+        assert True;
+    }
 }
