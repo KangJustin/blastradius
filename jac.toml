@@ -34,6 +34,10 @@ default_model = "claude-sonnet-4-6"
 directory = "."
 verbose = true
 
+[client.vite]
+plugins = ["tailwindcss()"]
+lib_imports = ["import tailwindcss from '@tailwindcss/vite'"]
+
 [serve]
 base_route_app = "app"
 
@@ -44,15 +48,7 @@ theme = "indigo"
 font = "geist"
 radius = "small"
 menuAccent = "subtle"
-menuColor = "default"
-[client.vite]
-plugins = ["tailwindcss()"]
-lib_imports = ["import tailwindcss from '@tailwindcss/vite'"]
 
 [jacpack]
 name = 'blastradius'
 description = 'Jac IDE snapshot for blastradius'
-
-[client.vite]
-plugins = ["tailwindcss()"]
-lib_imports = ["import tailwindcss from '@tailwindcss/vite'"]
