@@ -34,10 +34,6 @@ default_model = "claude-sonnet-4-6"
 directory = "."
 verbose = true
 
-[plugins.client.vite]
-plugins = ["tailwindcss()"]
-lib_imports = ["import tailwindcss from '@tailwindcss/vite'"]
-
 [serve]
 base_route_app = "app"
 
