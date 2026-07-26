@@ -1,0 +1,5 @@
+✖ Error: Error loading main.jac: cannot import name 'GraphData' from 'graphdata' (/app/graphdata.jac)
+✖ Error: cannot import name 'GraphData' from 'graphdata' (/app/graphdata.jac)
+    6 | import from blastradius { BlastRadius }
+    7 | import from agent { explain_risk }
+    8 | import from graphdata { get_graph, GraphData }
