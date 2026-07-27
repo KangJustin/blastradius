@@ -9,8 +9,7 @@ import from .ui.spinner { Spinner }
 import from .ui.alert { Alert, AlertTitle, AlertDescription }
 import from .ui.separator { Separator }
 import from ..lib.utils { cn }
-import from .CallGraph { CallGraph }
-import from .FullGraph { FullGraph }
+import from .GraphCanvas { GraphCanvas }
 
 glob _NL: str = chr(10);
 glob _BT: str = chr(96);
@@ -364,7 +363,7 @@ def:pub BlastAnalyzer() -> JsxElement {
                             <CardDescription>Click a node to select it as the blast-radius target.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <FullGraph graph_nodes={full_graph["nodes"] as list} graph_edges={full_graph["edges"] as list} on_select_fn={lambda (fn_name: str) { target_fn = fn_name; }} />
+                            <GraphCanvas mode="full" graph_nodes={full_graph["nodes"] as list} graph_edges={full_graph["edges"] as list} on_select={lambda (fn_name: str) { target_fn = fn_name; }} />
                         </CardContent>
                     </Card>
                 }}
@@ -411,7 +410,7 @@ def:pub BlastAnalyzer() -> JsxElement {
                                             </Button>
                                         </div>
                                     </div>
-                                    {if view_mode == "graph" { <CallGraph target_fn={target_fn} reports={blast_reports} hop_of={blast_hop_of} /> }}
+                                    {if view_mode == "graph" { <GraphCanvas mode="blast" target_fn={target_fn} reports={blast_reports} hop_of={blast_hop_of} /> }}
                                     {if view_mode == "list" { <BlastResultsList reports={blast_reports} hop_of={blast_hop_of} /> }}
                                 </div>
                             }}

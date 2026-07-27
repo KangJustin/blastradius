@@ -1,13 +1,18 @@
 ## Issues
-- [turn 8] Call Graph showed "0 functions, 0 calls" after ingest despite API returning data. Root cause: three separate `has` state vars (nodes list, edges list, boolean flag) updated across an `await` boundary caused React to render with the flag=true but lists still empty. Fixed by consolidating into a single `has full_graph: dict | None` state that carries both nodes and edges atomically.
+- [turn 9] Node click closure bug fixed: replaced inline lambdas in for-loop with delegated click handler using data-fn attributes on SVG elements + single onClick on parent SVG. e.target walks up to find data-fn.
 
 ## Learnings
-- Multiple `has` state updates across `await` boundaries in async handlers can desync in React. Consolidate related data into a single dict/object state to ensure atomic updates.
-- `[client.vite]` is the correct jac.toml key for Vite plugins.
-- Step indicator state should derive from real backend results, not click events.
+- Delegated event handling (data-* attributes + parent onClick) fixes the for-loop lambda closure bug in Jac JSX SVG rendering.
+- `el.parentElement` returns `HTMLElement | None` in Jac type system - cast with `as any`.
+- Nested `{for ...}` inside `{if ...}` in JSX slots is redundant wrapping - drop the inner braces.
+- Consolidate related state into single dict to avoid async desync across await boundaries.
 
 ## Last Action
-Turn 8: Fixed Call Graph rendering bug.
-- Consolidated full_graph_nodes + full_graph_edges + graph_loaded into single `full_graph: dict | None` state
-- Single atomic state update ensures nodes/edges arrive together
-- Verified: ingest /app shows "6 functions, 3 calls" with real graph nodes
+Turn 9: Merged FullGraph + CallGraph into unified GraphCanvas.cl.jac.
+- Single component with mode="full"|"blast" prop
+- Fixed node-click bug with delegated data-fn handler (verified: clicking _module_path correctly sets target_fn and updates step indicator)
+- Added zoom controls: +, -, Fit (bounding-box), 1:1 reset
+- Added hover tooltip: function name, file:line, caller/callee counts (computed client-side from edge data)
+- Updated graphdata.jac to include line number in node data
+- Deleted old FullGraph.cl.jac and CallGraph.cl.jac
+- Updated BlastAnalyzer.cl.jac to use GraphCanvas for both full and blast modes
