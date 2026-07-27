@@ -1,5 +1,5 @@
-"""Blast Radius Analyzer - single-page UI with three sequential steps:
-1. Ingest a repo  2. Compute blast radius  3. Explain risk."""
+"""Blast Radius Analyzer - restructured IA:
+Header / Repo toolbar / Step indicator / Content panels."""
 
 import from .ui.card { Card, CardHeader, CardTitle, CardDescription, CardContent }
 import from .ui.button { Button }
@@ -69,6 +69,7 @@ def apply_inline(text: str) -> str {
 }
 
 def:pub BlastAnalyzer() -> JsxElement {
+    # --- State ---
     has repo_path: str = "";
     has ingesting: bool = False;
     has ingest_result: dict | None = None;
@@ -76,6 +77,7 @@ def:pub BlastAnalyzer() -> JsxElement {
     has full_graph_nodes: list = [];
     has full_graph_edges: list = [];
     has graph_loaded: bool = False;
+    has api_ok: bool = True;
 
     has target_fn: str = "";
     has max_hops: int = 3;
@@ -90,6 +92,8 @@ def:pub BlastAnalyzer() -> JsxElement {
     has explaining: bool = False;
     has explanation: str = "";
     has explain_error: str = "";
+
+    # --- Handlers (unchanged logic) ---
 
     async def handle_ingest() -> None {
         if not repo_path { return; }
@@ -112,13 +116,14 @@ def:pub BlastAnalyzer() -> JsxElement {
             body = await resp.text();
             ingest_error = "Ingest failed (" + str(resp.status) + "): " + body;
             ingesting = False;
+            api_ok = False;
             return;
         }
+        api_ok = True;
         raw = await resp.text();
         parsed = JSON.parse(raw);
         r = parsed["data"]["result"];
         ingest_result = {"files": r["files"], "functions": r["functions"], "calls": r["calls"], "imports": r["imports"], "status": r["status"]};
-        # Fetch the full graph
         g_resp = await fetch("/function/get_graph", {
             "method": "POST",
             "headers": {"Content-Type": "application/json"},
@@ -153,8 +158,10 @@ def:pub BlastAnalyzer() -> JsxElement {
             body = await resp.text();
             blast_error = "Blast radius failed (" + str(resp.status) + "): " + body;
             computing = False;
+            api_ok = False;
             return;
         }
+        api_ok = True;
         raw_text = await resp.text();
         data = JSON.parse(raw_text);
         envelope = data["data"];
@@ -190,7 +197,9 @@ def:pub BlastAnalyzer() -> JsxElement {
         if not resp.ok {
             body = await resp.text();
             explain_error = "Explain failed (" + str(resp.status) + "): " + body;
+            api_ok = False;
         } else {
+            api_ok = True;
             data = await resp.json();
             result_val = data?["data"]?["result"];
             if not result_val { result_val = data?["result"]; }
@@ -207,58 +216,149 @@ def:pub BlastAnalyzer() -> JsxElement {
         except Exception { max_hops = 3; }
     }
 
-    return <div className="min-h-screen bg-background">
-        <div className="mx-auto max-w-4xl pt-12 pb-12 pl-4 pr-4 sm:pl-6 sm:pr-6">
-            <div className="flex flex-col gap-2 mb-8">
-                <h1 className="text-balance text-3xl font-bold tracking-tight">Blast Radius Analyzer</h1>
-                <p className="text-lg text-muted-foreground">Understand the impact of changing any function in your codebase.</p>
-            </div>
-            <div className="flex flex-col gap-8">
-                {#* Step 1: Ingest *#}
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <Badge variant="outline">Step 1</Badge>
-                            <CardTitle>Ingest Repository</CardTitle>
-                        </div>
-                        <CardDescription>Provide the absolute path to a repository on this server to parse its call graph.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-col gap-4">
-                            <div className="flex gap-2">
-                                <Input placeholder="/path/to/your/repo" value={repo_path} onChange={on_repo_change} className="flex-1" />
-                                <Button onClick={handle_ingest} disabled={ingesting or not repo_path}>
-                                    {if ingesting { <><Spinner className="size-4" /> {"Ingesting..."}</> }}
-                                    {if not ingesting { <>{"Ingest"}</> }}
-                                </Button>
-                            </div>
-                            {if ingest_error {
-                                <Alert><AlertTitle>Error</AlertTitle><AlertDescription>{ingest_error}</AlertDescription></Alert>
-                            }}
-                            {if ingest_result {
-                                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                                    <div className="flex flex-col gap-1 rounded-md border p-4">
-                                        <span className="text-sm text-muted-foreground">Files</span>
-                                        <span className="text-2xl font-semibold tabular-nums">{ingest_result["files"]}</span>
-                                    </div>
-                                    <div className="flex flex-col gap-1 rounded-md border p-4">
-                                        <span className="text-sm text-muted-foreground">Functions</span>
-                                        <span className="text-2xl font-semibold tabular-nums">{ingest_result["functions"]}</span>
-                                    </div>
-                                    <div className="flex flex-col gap-1 rounded-md border p-4">
-                                        <span className="text-sm text-muted-foreground">Calls</span>
-                                        <span className="text-2xl font-semibold tabular-nums">{ingest_result["calls"]}</span>
-                                    </div>
-                                    <div className="flex flex-col gap-1 rounded-md border p-4">
-                                        <span className="text-sm text-muted-foreground">Imports</span>
-                                        <span className="text-2xl font-semibold tabular-nums">{ingest_result["imports"]}</span>
-                                    </div>
-                                </div>
-                            }}
-                        </div>
-                    </CardContent>
-                </Card>
+    # --- Derived step states ---
+    step1_complete: bool = ingest_result is not None;
+    step2_complete: bool = bool(target_fn);
+    step3_complete: bool = blast_done and blast_found;
 
+    # --- Render ---
+
+    return <div className="min-h-screen bg-background">
+        {#* ==== 1. HEADER ==== *#}
+        <header className="border-b bg-card">
+            <div className="mx-auto max-w-5xl flex items-center justify-between pt-4 pb-4 pl-4 pr-4 sm:pl-6 sm:pr-6">
+                <div className="flex items-center gap-3">
+                    <h1 className="text-xl font-bold tracking-tight">BlastRadius</h1>
+                    <span className="text-sm text-muted-foreground hidden sm:inline">Agentic code-risk analysis</span>
+                </div>
+                <div className="flex items-center gap-3">
+                    <a
+                        href="https://github.com/KangJustin/blastradius"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+                    >
+                        {"GitHub"}
+                    </a>
+                    <div className="flex items-center gap-1.5" title={"Backend " + ("connected" if api_ok else "error")}>
+                        <span className={cn(
+                            "inline-block size-2 rounded-full",
+                            "bg-emerald-500" if api_ok else "bg-destructive"
+                        )} />
+                        <span className="text-xs text-muted-foreground">
+                            {"API" if api_ok else "Error"}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div className="mx-auto max-w-5xl pt-6 pb-12 pl-4 pr-4 sm:pl-6 sm:pr-6">
+            {#* ==== 2. REPO TOOLBAR ==== *#}
+            <div className="flex flex-col gap-3 mb-6">
+                <div className="flex gap-2">
+                    <Input
+                        placeholder="/absolute/path/to/repo"
+                        value={repo_path}
+                        onChange={on_repo_change}
+                        className="flex-1 font-mono text-sm"
+                    />
+                    <Button onClick={handle_ingest} disabled={ingesting or not repo_path} size="default">
+                        {if ingesting { <><Spinner className="size-4" /> {"Ingesting..."}</> }}
+                        {if not ingesting { <>{"Ingest"}</> }}
+                    </Button>
+                </div>
+                {#* Ingest status row *#}
+                {if ingest_error {
+                    <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                        <span className="inline-block size-2 rounded-full bg-destructive" />
+                        {ingest_error}
+                    </div>
+                }}
+                {if ingesting {
+                    <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm text-muted-foreground">
+                        <Spinner className="size-3.5" />
+                        {"Parsing repository..."}
+                    </div>
+                }}
+                {if ingest_result and not ingesting {
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-block size-2 rounded-full bg-emerald-500" />
+                        <span className="text-sm text-muted-foreground mr-1">{"Ingested"}</span>
+                        <Badge variant="secondary" className="text-xs tabular-nums">{str(ingest_result["files"]) + " files"}</Badge>
+                        <Badge variant="secondary" className="text-xs tabular-nums">{str(ingest_result["functions"]) + " functions"}</Badge>
+                        <Badge variant="secondary" className="text-xs tabular-nums">{str(ingest_result["calls"]) + " calls"}</Badge>
+                        <Badge variant="secondary" className="text-xs tabular-nums">{str(ingest_result["imports"]) + " imports"}</Badge>
+                    </div>
+                }}
+            </div>
+
+            {#* ==== 3. WORKFLOW STEP INDICATOR ==== *#}
+            <div className="flex items-center gap-0 mb-8 rounded-lg border bg-card p-1">
+                {#* Step 1 *#}
+                <div className={cn(
+                    "flex-1 flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+                    "bg-primary/10 text-foreground" if step1_complete else (
+                        "bg-muted/50 text-foreground" if ingesting else "text-muted-foreground"
+                    )
+                )}>
+                    <span className={cn(
+                        "inline-flex items-center justify-center size-5 rounded-full text-[10px] font-bold shrink-0",
+                        "bg-primary text-primary-foreground" if step1_complete else "bg-muted-foreground/20 text-muted-foreground"
+                    )}>
+                        {"1" if not step1_complete else ""}
+                        {if step1_complete {
+                            <svg viewBox="0 0 12 12" className="size-3 fill-current"><path d="M10 3L4.5 8.5 2 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        }}
+                    </span>
+                    <span className="font-medium">{"Ingest"}</span>
+                </div>
+                <Separator orientation="vertical" className="h-5" />
+                {#* Step 2 *#}
+                <div className={cn(
+                    "flex-1 flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+                    "bg-primary/10 text-foreground" if step2_complete else "text-muted-foreground"
+                )}>
+                    <span className={cn(
+                        "inline-flex items-center justify-center size-5 rounded-full text-[10px] font-bold shrink-0",
+                        "bg-primary text-primary-foreground" if step2_complete else "bg-muted-foreground/20 text-muted-foreground"
+                    )}>
+                        {"2" if not step2_complete else ""}
+                        {if step2_complete {
+                            <svg viewBox="0 0 12 12" className="size-3 fill-current"><path d="M10 3L4.5 8.5 2 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        }}
+                    </span>
+                    <span className="font-medium">{"Select function"}</span>
+                    {if step2_complete {
+                        <Badge variant="outline" className="text-xs ml-auto">{target_fn}</Badge>
+                    }}
+                </div>
+                <Separator orientation="vertical" className="h-5" />
+                {#* Step 3 *#}
+                <div className={cn(
+                    "flex-1 flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors",
+                    "bg-primary/10 text-foreground" if step3_complete else (
+                        "bg-muted/50 text-foreground" if computing else "text-muted-foreground"
+                    )
+                )}>
+                    <span className={cn(
+                        "inline-flex items-center justify-center size-5 rounded-full text-[10px] font-bold shrink-0",
+                        "bg-primary text-primary-foreground" if step3_complete else "bg-muted-foreground/20 text-muted-foreground"
+                    )}>
+                        {"3" if not step3_complete else ""}
+                        {if step3_complete {
+                            <svg viewBox="0 0 12 12" className="size-3 fill-current"><path d="M10 3L4.5 8.5 2 6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        }}
+                    </span>
+                    <span className="font-medium">{"Analyze impact"}</span>
+                    {if step3_complete {
+                        <Badge variant="outline" className="text-xs ml-auto">{str(len(blast_reports)) + " affected"}</Badge>
+                    }}
+                </div>
+            </div>
+
+            {#* ==== CONTENT PANELS ==== *#}
+            <div className="flex flex-col gap-6">
                 {#* Full Call Graph *#}
                 {if graph_loaded {
                     <Card>
@@ -267,7 +367,7 @@ def:pub BlastAnalyzer() -> JsxElement {
                                 <CardTitle>Call Graph</CardTitle>
                                 <Badge variant="secondary">{str(len(full_graph_nodes)) + " functions, " + str(len(full_graph_edges)) + " calls"}</Badge>
                             </div>
-                            <CardDescription>Full call graph of the ingested repository. Click a node to select it as the blast-radius target below.</CardDescription>
+                            <CardDescription>Click a node to select it as the blast-radius target.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <FullGraph graph_nodes={full_graph_nodes} graph_edges={full_graph_edges} on_select_fn={lambda (fn_name: str) { target_fn = fn_name; }} />
@@ -275,36 +375,33 @@ def:pub BlastAnalyzer() -> JsxElement {
                     </Card>
                 }}
 
-                {#* Step 2: Blast Radius *#}
+                {#* Function selection + Blast Radius *#}
                 <Card className={cn("transition-opacity", "" if ingest_result else "opacity-50 pointer-events-none")}>
                     <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <Badge variant="outline">Step 2</Badge>
-                            <CardTitle>Compute Blast Radius</CardTitle>
-                        </div>
-                        <CardDescription>Enter a function name to find all functions that could be affected by changing it.</CardDescription>
+                        <CardTitle>Blast Radius</CardTitle>
+                        <CardDescription>Select a target function and analyze its impact radius.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div className="flex flex-col gap-4">
                             <div className="flex gap-2">
-                                <Input placeholder="function_name" value={target_fn} onChange={on_target_change} className="flex-1" />
-                                <Input type="number" value={str(max_hops)} onChange={on_hops_change} className="w-24" placeholder="Hops" />
+                                <Input placeholder="function_name" value={target_fn} onChange={on_target_change} className="flex-1 font-mono text-sm" />
+                                <Input type="number" value={str(max_hops)} onChange={on_hops_change} className="w-20" placeholder="Hops" />
                                 <Button onClick={handle_blast} disabled={computing or not target_fn}>
-                                    {if computing { <><Spinner className="size-4" /> {"Computing..."}</> }}
+                                    {if computing { <><Spinner className="size-4" /> {"Analyzing..."}</> }}
                                     {if not computing { <>{"Analyze"}</> }}
                                 </Button>
                             </div>
                             {if blast_error { <Alert><AlertTitle>Error</AlertTitle><AlertDescription>{blast_error}</AlertDescription></Alert> }}
                             {if blast_done and not blast_found {
-                                <Alert><AlertTitle>Function not found</AlertTitle>
-                                    <AlertDescription>{"The function \"" + target_fn + "\" was not found in the ingested graph."}</AlertDescription>
+                                <Alert>
+                                    <AlertTitle>Function not found</AlertTitle>
+                                    <AlertDescription>{"\"" + target_fn + "\" was not found in the ingested graph."}</AlertDescription>
                                 </Alert>
                             }}
                             {if blast_done and blast_found {
-                                <div className="flex flex-col gap-6">
+                                <div className="flex flex-col gap-4">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <h3 className="text-lg font-semibold">Blast Radius</h3>
                                             <Badge variant="secondary">{str(len(blast_reports)) + " functions affected"}</Badge>
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -314,8 +411,8 @@ def:pub BlastAnalyzer() -> JsxElement {
                                                 <button className={cn("px-3 py-1 text-sm border-l", "bg-primary text-primary-foreground" if view_mode == "list" else "bg-background text-muted-foreground hover:text-foreground")}
                                                     onClick={lambda (e: MouseEvent) { view_mode = "list"; }}>{"List"}</button>
                                             </div>
-                                            <Button onClick={handle_explain} disabled={explaining} variant="outline">
-                                                {if explaining { <><Spinner className="size-4" /> {"Analyzing..."}</> }}
+                                            <Button onClick={handle_explain} disabled={explaining} variant="outline" size="sm">
+                                                {if explaining { <><Spinner className="size-3.5" /> {"Explaining..."}</> }}
                                                 {if not explaining { <>{"Explain Risk"}</> }}
                                             </Button>
                                         </div>
@@ -328,7 +425,7 @@ def:pub BlastAnalyzer() -> JsxElement {
                     </CardContent>
                 </Card>
 
-                {#* Step 3: Explanation *#}
+                {#* Explanation *#}
                 {if explaining {
                     <Card><CardContent className="flex items-center justify-center pt-12 pb-12">
                         <div className="flex flex-col items-center gap-4">
