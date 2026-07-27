@@ -138,7 +138,29 @@ def:pub BlastAnalyzer() -> JsxElement {
             g_raw = await g_resp.text();
             g_parsed = JSON.parse(g_raw);
             g_result = g_parsed["data"]["result"];
-            full_graph = {"nodes": g_result["nodes"], "edges": g_result["edges"]};
+            g_nodes = g_result["nodes"];
+            g_edges = g_result["edges"];
+            # Only set if we actually got data (server may have restarted mid-flow)
+            if g_nodes and len(g_nodes as list) > 0 {
+                full_graph = {"nodes": g_nodes, "edges": g_edges};
+            } else {
+                # Retry once — server may have restarted between ingest and get_graph
+                g_resp2 = await fetch("/function/get_graph", {
+                    "method": "POST",
+                    "headers": {"Content-Type": "application/json"},
+                    "body": JSON.stringify({})
+                });
+                if g_resp2.ok {
+                    g_raw2 = await g_resp2.text();
+                    g_parsed2 = JSON.parse(g_raw2);
+                    g_result2 = g_parsed2["data"]["result"];
+                    g_nodes2 = g_result2["nodes"];
+                    g_edges2 = g_result2["edges"];
+                    if g_nodes2 and len(g_nodes2 as list) > 0 {
+                        full_graph = {"nodes": g_nodes2, "edges": g_edges2};
+                    }
+                }
+            }
         }
         ingesting = False;
     }
@@ -478,13 +500,19 @@ def:pub BlastAnalyzer() -> JsxElement {
                     </Card>
                 }}
 
-                {#* Fallback: function input when no graph click available *#}
-                {if not target_fn and ingest_result {
+                {#* Function input — always visible after ingest *#}
+                {if ingest_result {
                     <Card>
-                        <CardContent className="pt-4">
+                        <CardHeader>
+                            <CardTitle className="text-sm">Target Function</CardTitle>
+                        </CardHeader>
+                        <CardContent>
                             <div className="flex gap-2">
-                                <Input placeholder="function_name" value={target_fn} onChange={on_target_change} className="flex-1 font-mono text-sm" />
-                                <Button onClick={handle_blast} disabled={computing or not target_fn}>{"Analyze"}</Button>
+                                <Input placeholder="Type a function name..." value={target_fn} onChange={on_target_change} className="flex-1 font-mono text-sm" />
+                                <Button onClick={handle_blast} disabled={computing or not target_fn}>
+                                    {if computing { <><Spinner className="size-4" /> {"Analyzing..."}</> }}
+                                    {if not computing { <>{"Analyze"}</> }}
+                                </Button>
                             </div>
                         </CardContent>
                     </Card>

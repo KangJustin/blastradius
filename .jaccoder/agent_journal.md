@@ -1,20 +1,13 @@
 ## Issues
-- [turn 11] Backticks in sem strings get mangled to f-strings by auto-fix. Removed backticks from sem descriptions.
-- [turn 11] agent.test.jac has type errors from RiskAssessment change (pre-existing test file, not blocking).
+- [turn 12] Graph "0 functions" after ingest: server restarts from HMR between ingest and get_graph, clearing the graph. Added retry logic - if first get_graph returns empty, retry once.
+- [turn 12] Function name input disappeared after first keystroke: conditional `{if not target_fn and ingest_result}` hid the input as soon as target_fn became non-empty. Changed to always show after ingest with `{if ingest_result}`.
 
 ## Learnings
-- Backticks in string literals are special in Jac (keyword escaping). Avoid them in sem strings.
-- RiskAssessment obj with sem annotations enables structured LLM output with typed fields.
-- Severity normalization should happen server-side (in the wrapper def:pub), not trusted from LLM output.
+- Server restarts from HMR clear the in-memory graph. get_graph after ingest may return empty on first call. Retry once.
+- Conditional rendering that depends on the same state a controlled input writes to will hide the input on first keystroke.
 
 ## Last Action
-Turn 11: Phase 4 - RiskReport component + structured explain_risk.
-- Replaced agent.jac with RiskAssessment struct version (summary, why_risky, could_break, severity)
-- explain_risk now returns RiskAssessment with normalized severity (low/medium/high)
-- Created RiskReport.cl.jac with 5 states: empty, not-requested, loading (skeleton), error (retry), success (structured report)
-- Severity badge: colored pill (emerald/yellow/red) for low/medium/high
-- Scannable sections: Summary, Why risky, What could break
-- Collapsed "Detailed explanation" section
-- Data source labels: graph traversal vs AI-generated
-- Wired into BlastAnalyzer, removed old Explanation section and Explain Risk button
-- Registered RiskAssessment in main.jac imports
+Turn 12: Fixed two blocking bugs.
+- Graph empty after ingest: added retry logic for get_graph when first response has 0 nodes
+- Function input not editable: changed from conditional fallback to always-visible "Target Function" card after ingest
+- Verified: input accepts typed text, ContextPanel shows real callers/callees
