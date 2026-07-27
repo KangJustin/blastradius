@@ -11,6 +11,7 @@ import from .ui.separator { Separator }
 import from ..lib.utils { cn }
 import from .GraphCanvas { GraphCanvas }
 import from .ContextPanel { ContextPanel }
+import from .RiskReport { RiskReport }
 
 glob _NL: str = chr(10);
 glob _BT: str = chr(96);
@@ -467,10 +468,6 @@ def:pub BlastAnalyzer() -> JsxElement {
                                         <button className={cn("px-3 py-1 text-sm border-l", "bg-primary text-primary-foreground" if view_mode == "list" else "bg-background text-muted-foreground hover:text-foreground")}
                                             onClick={lambda (e: MouseEvent) { view_mode = "list"; }}>{"List"}</button>
                                     </div>
-                                    <Button onClick={handle_explain} disabled={explaining} variant="outline" size="sm">
-                                        {if explaining { <><Spinner className="size-3.5" /> {"Explaining..."}</> }}
-                                        {if not explaining { <>{"Explain Risk"}</> }}
-                                    </Button>
                                 </div>
                             </div>
                         </CardHeader>
@@ -493,21 +490,9 @@ def:pub BlastAnalyzer() -> JsxElement {
                     </Card>
                 }}
 
-                {#* Explanation *#}
-                {if explaining {
-                    <Card><CardContent className="flex items-center justify-center pt-12 pb-12">
-                        <div className="flex flex-col items-center gap-4">
-                            <Spinner className="size-8" />
-                            <p className="text-muted-foreground">Analyzing risk with AI... This may take up to 15 seconds.</p>
-                        </div>
-                    </CardContent></Card>
-                }}
-                {if explain_error { <Alert><AlertTitle>Explanation Error</AlertTitle><AlertDescription>{explain_error}</AlertDescription></Alert> }}
-                {if explanation {
-                    <Card>
-                        <CardHeader><CardTitle>Risk Analysis</CardTitle><CardDescription>AI-generated assessment of the change impact</CardDescription></CardHeader>
-                        <CardContent><div className="prose prose-sm max-w-none text-foreground">{unsafe_html(render_markdown(explanation))}</div></CardContent>
-                    </Card>
+                {#* Risk Report *#}
+                {if blast_done and blast_found {
+                    <RiskReport target_fn={target_fn} affected={blast_reports} />
                 }}
             </div>
         </div>

@@ -1,7 +1,10 @@
 """The explainer agent: turns a raw blast-radius result (real graph nodes,
-computed by walker traversal in blastradius.jac) into a plain-English risk
-narrative, with two tools that let the model pull more graph context before
-answering instead of guessing.
+computed by walker traversal in blastradius.jac) into a structured risk
+assessment, with a tool that lets the model pull more graph context before
+answering instead of guessing. f"suggest_tests" is deterministic (naming-
+convention lookup, not an LLM call) and is exposed as its own endpoint so
+the frontend can fetch it independently of - and even if - explain_risk
+fails.
 """
 
 import from graph { Function }
@@ -41,9 +44,40 @@ def:pub suggest_tests(affected: list[str]) -> list[str] {
 sem suggest_tests = "Guess likely test file paths, by naming convention, for a list of affected function names.";
 sem suggest_tests.affected = "Function names whose owning file's likely test path should be guessed.";
 
-def:pub explain_risk(target: str, affected: list[str]) -> str by llm(
-    tools=[read_source, suggest_tests]
+obj RiskAssessment {
+    has summary: str;
+    has why_risky: str;
+    has could_break: str;
+    has severity: str;
+}
+sem RiskAssessment = "A structured risk assessment for a function about to be changed, split into scannable sections instead of one paragraph.";
+sem RiskAssessment.summary = "1-2 sentences: what the target function does.";
+sem RiskAssessment.why_risky = "1-2 sentences: why changing it carries risk, grounded in the real callers/callees it has.";
+sem RiskAssessment.could_break = "1-3 sentences: concretely what could break downstream.";
+sem RiskAssessment.severity = "The single word 'low', 'medium', or 'high' - nothing else, no explanation, no punctuation. Based on how many functions are affected and how central the target is to the call graph.";
+
+def _explain_risk_llm(target: str, affected: list[str]) -> RiskAssessment by llm(
+    tools=[read_source]
 );
-sem explain_risk = "The functions in `affected` are the real, already-computed blast radius of changing `target` (from a graph traversal over actual call edges - trust this list completely, never re-derive or second-guess which functions are affected). Explain the risk of changing `target` in plain English for a developer who is about to touch it: what could break, roughly how severe, and what to check first. Use read_source if you need to see a specific function's body before judging its risk. Use suggest_tests to recommend concrete test files to run before merging. Keep it under 150 words.";
-sem explain_risk.target = "Name of the function about to be changed.";
-sem explain_risk.affected = "Names of functions in the blast radius, already computed by graph traversal - ground truth, not a guess.";
+sem _explain_risk_llm = "The functions in affected are the real blast radius of changing target. Fill out a structured risk assessment. Use read_source to see function bodies. Keep every field concise.";
+sem _explain_risk_llm.target = "Name of the function about to be changed.";
+sem _explain_risk_llm.affected = "Names of functions in the blast radius, already computed by graph traversal - ground truth, not a guess.";
+
+def:pub explain_risk(target: str, affected: list[str]) -> RiskAssessment {
+    raw: RiskAssessment = _explain_risk_llm(target, affected);
+    lowered: str = raw.severity.lower();
+    severity: str = "medium";
+    if "high" in lowered {
+        severity = "high";
+    } elif "low" in lowered {
+        severity = "low";
+    } elif "medium" in lowered {
+        severity = "medium";
+    }
+    return RiskAssessment(
+        summary=raw.summary,
+        why_risky=raw.why_risky,
+        could_break=raw.could_break,
+        severity=severity
+    );
+}
