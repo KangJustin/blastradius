@@ -74,9 +74,7 @@ def:pub BlastAnalyzer() -> JsxElement {
     has ingesting: bool = False;
     has ingest_result: dict | None = None;
     has ingest_error: str = "";
-    has full_graph_nodes: list = [];
-    has full_graph_edges: list = [];
-    has graph_loaded: bool = False;
+    has full_graph: dict | None = None;
     has api_ok: bool = True;
 
     has target_fn: str = "";
@@ -100,9 +98,7 @@ def:pub BlastAnalyzer() -> JsxElement {
         ingesting = True;
         ingest_error = "";
         ingest_result = None;
-        full_graph_nodes = [];
-        full_graph_edges = [];
-        graph_loaded = False;
+        full_graph = None;
         blast_done = False;
         blast_reports = [];
         blast_hop_of = {};
@@ -133,9 +129,7 @@ def:pub BlastAnalyzer() -> JsxElement {
             g_raw = await g_resp.text();
             g_parsed = JSON.parse(g_raw);
             g_result = g_parsed["data"]["result"];
-            full_graph_nodes = g_result["nodes"] as list;
-            full_graph_edges = g_result["edges"] as list;
-            graph_loaded = True;
+            full_graph = {"nodes": g_result["nodes"], "edges": g_result["edges"]};
         }
         ingesting = False;
     }
@@ -360,17 +354,17 @@ def:pub BlastAnalyzer() -> JsxElement {
             {#* ==== CONTENT PANELS ==== *#}
             <div className="flex flex-col gap-6">
                 {#* Full Call Graph *#}
-                {if graph_loaded {
+                {if full_graph {
                     <Card>
                         <CardHeader>
                             <div className="flex items-center gap-2">
                                 <CardTitle>Call Graph</CardTitle>
-                                <Badge variant="secondary">{str(len(full_graph_nodes)) + " functions, " + str(len(full_graph_edges)) + " calls"}</Badge>
+                                <Badge variant="secondary">{str(len(full_graph["nodes"] as list)) + " functions, " + str(len(full_graph["edges"] as list)) + " calls"}</Badge>
                             </div>
                             <CardDescription>Click a node to select it as the blast-radius target.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <FullGraph graph_nodes={full_graph_nodes} graph_edges={full_graph_edges} on_select_fn={lambda (fn_name: str) { target_fn = fn_name; }} />
+                            <FullGraph graph_nodes={full_graph["nodes"] as list} graph_edges={full_graph["edges"] as list} on_select_fn={lambda (fn_name: str) { target_fn = fn_name; }} />
                         </CardContent>
                     </Card>
                 }}
