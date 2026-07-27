@@ -454,6 +454,17 @@ def:pub BlastAnalyzer() -> JsxElement {
                     </Card>
                 }}
 
+                {#* Function input — always visible after ingest *#}
+                {if ingest_result {
+                    <div className="flex gap-2">
+                        <Input placeholder="Type a function name..." value={target_fn} onChange={on_target_change} className="flex-1 font-mono text-sm" />
+                        <Button onClick={handle_blast} disabled={computing or not target_fn} size="default">
+                            {if computing { <><Spinner className="size-4" /> {"Analyzing..."}</> }}
+                            {if not computing { <>{"Analyze"}</> }}
+                        </Button>
+                    </div>
+                }}
+
                 {#* Context Panel (pre/post analysis) *#}
                 {if target_fn {
                     <ContextPanel
@@ -500,23 +511,7 @@ def:pub BlastAnalyzer() -> JsxElement {
                     </Card>
                 }}
 
-                {#* Function input — always visible after ingest *#}
-                {if ingest_result {
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-sm">Target Function</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex gap-2">
-                                <Input placeholder="Type a function name..." value={target_fn} onChange={on_target_change} className="flex-1 font-mono text-sm" />
-                                <Button onClick={handle_blast} disabled={computing or not target_fn}>
-                                    {if computing { <><Spinner className="size-4" /> {"Analyzing..."}</> }}
-                                    {if not computing { <>{"Analyze"}</> }}
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                }}
+
 
                 {#* Risk Report *#}
                 {if blast_done and blast_found {
