@@ -1,18 +1,17 @@
 ## Issues
-- [turn 9] Node click closure bug fixed: replaced inline lambdas in for-loop with delegated click handler using data-fn attributes on SVG elements + single onClick on parent SVG. e.target walks up to find data-fn.
+- [turn 10] suggest_tests endpoint registered. ContextPanel created with pre/post analysis states. Reveal animation timer has stale closure on hop_idx (setTimeout + closure). suggest_tests client fetch may silently fail due to same async closure issue.
 
 ## Learnings
-- Delegated event handling (data-* attributes + parent onClick) fixes the for-loop lambda closure bug in Jac JSX SVG rendering.
-- `el.parentElement` returns `HTMLElement | None` in Jac type system - cast with `as any`.
-- Nested `{for ...}` inside `{if ...}` in JSX slots is redundant wrapping - drop the inner braces.
-- Consolidate related state into single dict to avoid async desync across await boundaries.
+- `def:pub` on an existing function + adding to main.jac import registers a new endpoint.
+- setTimeout callbacks in Jac client code have closure issues with mutable locals - need Ref pattern or state-based approach.
+- Consolidate related async state updates into single dict to avoid desync.
 
 ## Last Action
-Turn 9: Merged FullGraph + CallGraph into unified GraphCanvas.cl.jac.
-- Single component with mode="full"|"blast" prop
-- Fixed node-click bug with delegated data-fn handler (verified: clicking _module_path correctly sets target_fn and updates step indicator)
-- Added zoom controls: +, -, Fit (bounding-box), 1:1 reset
-- Added hover tooltip: function name, file:line, caller/callee counts (computed client-side from edge data)
-- Updated graphdata.jac to include line number in node data
-- Deleted old FullGraph.cl.jac and CallGraph.cl.jac
-- Updated BlastAnalyzer.cl.jac to use GraphCanvas for both full and blast modes
+Turn 10: Added ContextPanel + suggest_tests endpoint + reveal animation.
+- Made suggest_tests def:pub in agent.jac, registered in main.jac
+- Created ContextPanel.cl.jac with pre-analysis (fn details, callers/callees, source, analyze button) and post-analysis (affected count, max hop, severity placeholder, suggested tests) states
+- Added reveal animation with setTimeout stagger (hop_idx closure issue - shows hop 0)
+- Added fire_suggest_tests parallel fetch
+- Verified: suggest_tests endpoint returns real test paths via curl
+- Verified: ContextPanel shows real callers/callees/source from graph data
+- Known issues: reveal counter stuck at hop 0 (closure), suggest_tests may not render in UI (async closure)

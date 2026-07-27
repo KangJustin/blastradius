@@ -10,6 +10,7 @@ import from .ui.alert { Alert, AlertTitle, AlertDescription }
 import from .ui.separator { Separator }
 import from ..lib.utils { cn }
 import from .GraphCanvas { GraphCanvas }
+import from .ContextPanel { ContextPanel }
 
 glob _NL: str = chr(10);
 glob _BT: str = chr(96);
@@ -90,6 +91,14 @@ def:pub BlastAnalyzer() -> JsxElement {
     has explanation: str = "";
     has explain_error: str = "";
 
+    # Reveal animation
+    has revealed_hops: int = 0;
+    has reveal_timer: int = 0;
+
+    # Suggest tests
+    has suggested_tests: list = [];
+    has tests_loading: bool = False;
+
     # --- Handlers (unchanged logic) ---
 
     async def handle_ingest() -> None {
@@ -142,6 +151,9 @@ def:pub BlastAnalyzer() -> JsxElement {
         blast_hop_of = {};
         blast_found = False;
         explanation = "";
+        revealed_hops = 0;
+        suggested_tests = [];
+        tests_loading = False;
         resp = await fetch("/walker/BlastRadius", {
             "method": "POST",
             "headers": {"Content-Type": "application/json"},
@@ -171,6 +183,53 @@ def:pub BlastAnalyzer() -> JsxElement {
         }
         blast_done = True;
         computing = False;
+        # Start reveal animation: stagger by hop
+        if blast_found {
+            revealed_hops = 0;
+            start_reveal();
+            # Fire suggest_tests in parallel (non-blocking)
+            fire_suggest_tests();
+        }
+    }
+
+    async def fire_suggest_tests() -> None {
+        tests_loading = True;
+        affected_names: list[str] = [];
+        for r in blast_reports {
+            if r { affected_names = affected_names + [str(r["name"])]; }
+        }
+        resp = await fetch("/function/suggest_tests", {
+            "method": "POST",
+            "headers": {"Content-Type": "application/json"},
+            "body": JSON.stringify({"affected": affected_names})
+        });
+        if resp.ok {
+            raw = await resp.text();
+            parsed = JSON.parse(raw);
+            result = parsed["data"]["result"];
+            if result { suggested_tests = result as list; }
+        }
+        tests_loading = False;
+    }
+
+    def start_reveal() {
+        # Find max hop in results
+        max_h: int = 0;
+        for k_raw in blast_hop_of.keys() {
+            v = blast_hop_of[k_raw];
+            hv: int = int(v) if v else 0;
+            if hv > max_h { max_h = hv; }
+        }
+        # Stagger reveal: increment revealed_hops every 400ms
+        hop_idx: int = 0;
+        def tick() {
+            hop_idx = hop_idx + 1;
+            revealed_hops = hop_idx;
+            if hop_idx < max_h + 1 {
+                setTimeout(tick, 400);
+            }
+        }
+        setTimeout(tick, 200);
     }
 
     async def handle_explain() -> None {
@@ -205,6 +264,10 @@ def:pub BlastAnalyzer() -> JsxElement {
     def on_target_change(e: ChangeEvent) { target_fn = e.target.value; }
     def on_hops_change(e: ChangeEvent) {
         val: str = e.target.value;
+        try { max_hops = int(val); }
+        except Exception { max_hops = 3; }
+    }
+    def set_hops_from_str(val: str) {
         try { max_hops = int(val); }
         except Exception { max_hops = 3; }
     }
@@ -368,55 +431,67 @@ def:pub BlastAnalyzer() -> JsxElement {
                     </Card>
                 }}
 
-                {#* Function selection + Blast Radius *#}
-                <Card className={cn("transition-opacity", "" if ingest_result else "opacity-50 pointer-events-none")}>
-                    <CardHeader>
-                        <CardTitle>Blast Radius</CardTitle>
-                        <CardDescription>Select a target function and analyze its impact radius.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="flex flex-col gap-4">
+                {#* Context Panel (pre/post analysis) *#}
+                {if target_fn {
+                    <ContextPanel
+                        target_fn={target_fn}
+                        full_graph={full_graph}
+                        blast_done={blast_done}
+                        blast_found={blast_found}
+                        blast_reports={blast_reports}
+                        blast_hop_of={blast_hop_of}
+                        blast_error={blast_error}
+                        computing={computing}
+                        max_hops={max_hops}
+                        on_hops_change={set_hops_from_str}
+                        on_analyze={handle_blast}
+                        revealed_hops={revealed_hops}
+                        suggested_tests={suggested_tests}
+                        tests_loading={tests_loading}
+                    />
+                }}
+
+                {#* Blast Radius Graph (post-analysis) *#}
+                {if blast_done and blast_found {
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <CardTitle>Impact Graph</CardTitle>
+                                    <Badge variant="secondary">{str(len(blast_reports)) + " affected"}</Badge>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex rounded-md border overflow-hidden">
+                                        <button className={cn("px-3 py-1 text-sm", "bg-primary text-primary-foreground" if view_mode == "graph" else "bg-background text-muted-foreground hover:text-foreground")}
+                                            onClick={lambda (e: MouseEvent) { view_mode = "graph"; }}>{"Graph"}</button>
+                                        <button className={cn("px-3 py-1 text-sm border-l", "bg-primary text-primary-foreground" if view_mode == "list" else "bg-background text-muted-foreground hover:text-foreground")}
+                                            onClick={lambda (e: MouseEvent) { view_mode = "list"; }}>{"List"}</button>
+                                    </div>
+                                    <Button onClick={handle_explain} disabled={explaining} variant="outline" size="sm">
+                                        {if explaining { <><Spinner className="size-3.5" /> {"Explaining..."}</> }}
+                                        {if not explaining { <>{"Explain Risk"}</> }}
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            {if view_mode == "graph" { <GraphCanvas mode="blast" target_fn={target_fn} reports={blast_reports} hop_of={blast_hop_of} /> }}
+                            {if view_mode == "list" { <BlastResultsList reports={blast_reports} hop_of={blast_hop_of} /> }}
+                        </CardContent>
+                    </Card>
+                }}
+
+                {#* Fallback: function input when no graph click available *#}
+                {if not target_fn and ingest_result {
+                    <Card>
+                        <CardContent className="pt-4">
                             <div className="flex gap-2">
                                 <Input placeholder="function_name" value={target_fn} onChange={on_target_change} className="flex-1 font-mono text-sm" />
-                                <Input type="number" value={str(max_hops)} onChange={on_hops_change} className="w-20" placeholder="Hops" />
-                                <Button onClick={handle_blast} disabled={computing or not target_fn}>
-                                    {if computing { <><Spinner className="size-4" /> {"Analyzing..."}</> }}
-                                    {if not computing { <>{"Analyze"}</> }}
-                                </Button>
+                                <Button onClick={handle_blast} disabled={computing or not target_fn}>{"Analyze"}</Button>
                             </div>
-                            {if blast_error { <Alert><AlertTitle>Error</AlertTitle><AlertDescription>{blast_error}</AlertDescription></Alert> }}
-                            {if blast_done and not blast_found {
-                                <Alert>
-                                    <AlertTitle>Function not found</AlertTitle>
-                                    <AlertDescription>{"\"" + target_fn + "\" was not found in the ingested graph."}</AlertDescription>
-                                </Alert>
-                            }}
-                            {if blast_done and blast_found {
-                                <div className="flex flex-col gap-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <Badge variant="secondary">{str(len(blast_reports)) + " functions affected"}</Badge>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex rounded-md border overflow-hidden">
-                                                <button className={cn("px-3 py-1 text-sm", "bg-primary text-primary-foreground" if view_mode == "graph" else "bg-background text-muted-foreground hover:text-foreground")}
-                                                    onClick={lambda (e: MouseEvent) { view_mode = "graph"; }}>{"Graph"}</button>
-                                                <button className={cn("px-3 py-1 text-sm border-l", "bg-primary text-primary-foreground" if view_mode == "list" else "bg-background text-muted-foreground hover:text-foreground")}
-                                                    onClick={lambda (e: MouseEvent) { view_mode = "list"; }}>{"List"}</button>
-                                            </div>
-                                            <Button onClick={handle_explain} disabled={explaining} variant="outline" size="sm">
-                                                {if explaining { <><Spinner className="size-3.5" /> {"Explaining..."}</> }}
-                                                {if not explaining { <>{"Explain Risk"}</> }}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    {if view_mode == "graph" { <GraphCanvas mode="blast" target_fn={target_fn} reports={blast_reports} hop_of={blast_hop_of} /> }}
-                                    {if view_mode == "list" { <BlastResultsList reports={blast_reports} hop_of={blast_hop_of} /> }}
-                                </div>
-                            }}
-                        </div>
-                    </CardContent>
-                </Card>
+                        </CardContent>
+                    </Card>
+                }}
 
                 {#* Explanation *#}
                 {if explaining {

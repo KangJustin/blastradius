@@ -20,7 +20,7 @@ def read_source(fn_name: str) -> str {
 sem read_source = "Read the full source snippet of a function already in the graph, by its exact name.";
 sem read_source.fn_name = "Exact function name to look up.";
 
-def suggest_tests(affected: list[str]) -> list[str] {
+def:pub suggest_tests(affected: list[str]) -> list[str] {
     out: list[str] = [];
     for target_name in affected {
         matches = [root -->[?:Function, name == target_name]];
